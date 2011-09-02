@@ -38,16 +38,15 @@ The Person class
 
 Create a new person
 
-    >>> inky = Person(
-    ...     first_name='Inkbert',
-    ...     last_name='McSquibbles'
-    ...     contact_data=ContactData(
-    ...         email_addresses=[
-    ...             EmailAddress(address='inkbert@feedmagnet.com', location='Work'),
-    ...             EmailAddress(address='inkbert@gmail.com', location='Home'),
-    ...         ],
-    ...         phone_numbers=[PhoneNumber(number='512-555-1234', location='Work'),
-    ...     ),
+    >>> inky = Person()
+    >>> inky.first_name = 'Inkbert'
+    >>> inky.last_name = 'McSquibbles'
+    >>> inky.contact_data = ContactData(
+    ...     email_addresses=[
+    ...         EmailAddress(address='inkbert@feedmagnet.com', location='Work'),
+    ...         EmailAddress(address='inkbert@gmail.com', location='Home'),
+    ...     ],
+    ...     phone_numbers=[PhoneNumber(number='512-555-1234', location='Work')],
     ... )
     >>> inky.save()
 
