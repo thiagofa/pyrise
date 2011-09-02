@@ -91,3 +91,61 @@ Get a list of all the people records that have changed since a specific date/tim
 Perform an advanced search using the criteria options from the website:
 
     >>> people = Person.filter(email='gmail.com', city='austin, state='tx')
+
+Delete a person
+
+    >>> person = Person.get(12345)
+    >>> person.delete()
+
+
+The Tag class
+-------------------
+
+Add a tag to a person
+
+    >>> person = Person.get(12345)
+    >>> person.add_tag('freaking-amazing')
+
+Get a list of tags for a person
+
+    >>> tags = person.tags
+    >>> for tag in tags:
+    ...     print tag.name
+
+Remove a tag from a person
+
+    >>> person.remove_tag(123)
+
+
+The Note class
+-------------------
+
+Add a note to a person
+
+    >>> person = Person.get(12345)
+    >>> person.add_note('Just got off the phone with this guy. He rocks.')
+    >>> person.save()
+
+More advanced way to add a note
+
+    >>> note = Note()
+    >>> note.body = 'This is the best note ever.\n-----------------\nSee how I separated text with a line? Blamo.'
+    >>> note.subject_type = 'Party'
+    >>> note.subject_id = 12345
+    >>> note.visible_to = 'Owner'
+    >>> note.owner_id = 23456
+    >>> note.collection_type = 'Deal'
+    >>> note.collection_id = 345
+    >>> note.save()
+    
+Get details for a note, edit them, and save
+
+    >>> note = Note(1234)
+    >>> print note.body
+    >>> note.body += '\n------------\nMore details added to the note!'
+    >>> note.save()
+
+Delete a note
+
+    >>> note = Note(1234)
+    >>> note.delete()

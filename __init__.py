@@ -551,7 +551,18 @@ class Person(HighriseObject):
 
         # remove the tag
         return Tag.remove_from('people', self.id, tag_id)
+    
+    def add_note(self, body, **kwargs):
+        """Add a note to a person"""
         
+        # sanity check: has this person been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the person before you can load thier tags'
+        
+        # add the note and save it to Highrise
+        note = Note(body=body, subject_id=self.id, subject_type='Party', **kwargs)
+        note.save()
+    
     def save(self):
         """Save a person to Highrise."""
 
