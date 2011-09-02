@@ -155,18 +155,15 @@ class HighriseObject(object):
         """Get a list of objects of this type from Highrise"""
 
         # retrieve the data from Highrise
-        try: 
-            objects = []
-            xml = Highrise.request(path)
+        objects = []
+        xml = Highrise.request(path)
 
-            # make a list of objects and return it
-            for item in xml.getiterator(tag=tag):
-                objects.append(cls.from_xml(item))
+        # make a list of objects and return it
+        for item in xml.getiterator(tag=tag):
+            objects.append(cls.from_xml(item))
 
-            return objects
+        return objects
 
-        except NotFound:
-            return []
 
     def __init__(self, parent=None, **kwargs):
         """Create a new object manually."""
@@ -270,7 +267,23 @@ class Tag(HighriseObject):
         """Get all tags"""
 
         return cls._list('tags.xml', 'tag')
+    
+    @classmethod
+    def get_by(cls, subject, id):
+        """Get tags for a specific person, company, case, or deal"""
 
+        return cls._list('%s/%s/tags.xml' % (subject, id), 'tag')
+
+    @classmethod
+    def add_to(cls, subject, id, name):
+        """Add a tag to a specific person, company, case, or deal"""
+        
+        xml = ElementTree.Element(tag='name')
+        xml.text = name
+        xml_string = ElementTree.tostring(xml)
+        
+        return Highrise.request('%s/%s/tags.xml' % (subject, id), method='POST', xml=xml_string)
+            
 
 class ContactData(HighriseObject):
     """An object representing contact data for a
@@ -384,7 +397,7 @@ class Person(HighriseObject):
         'created_at': HighriseField(),
         'updated_at': HighriseField(),
     }
-
+    
     @classmethod
     def all(cls):
         """Get all people"""
@@ -444,6 +457,27 @@ class Person(HighriseObject):
         for person_xml in xml.getiterator(tag='person'):
             return Person.from_xml(person_xml)
 
+    @property
+    def tags(self):
+        """Get the tags associated with this person"""
+        
+        # sanity check: has this person been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the person before you can load thier tags'
+        
+        # get the tags
+        return Tag.get_by('people', self.id)
+    
+    def add_tag(self, name):
+        """Add a tag to a person"""
+        
+        # sanity check: has this person been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the person before you can load thier tags'
+
+        # add the tag
+        return Tag.add_to('people', self.id, name)
+        
     def save(self):
         """Save a person to Highrise."""
 
@@ -465,15 +499,14 @@ class Person(HighriseObject):
             path = '/people/%s.xml' % self.id
             response = Highrise.request(path, method=method, xml=xml_string)
             new = Person.get(self.id)
-            self.id = new.id
 
         # update the values of self to align with what came back from Highrise
-        
+        self.__dict__ = new.__dict__
 
     def delete(self):
         """Delete a person from Highrise."""
 
-        Highrise.request('/people/%s.xml' % self.id, method='DELETE')
+        Highrise.request('/people/%s.xml' % self.id, method='DELETE')    
 
 
 class ElevatorError(Exception):
