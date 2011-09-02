@@ -39,8 +39,8 @@ class Highrise:
         url = '%s/%s' % (cls._server, path.strip('/'))
         
         # create the curl command
-        if method == 'GET':
-            request, content = cls._http.request(url, method='GET')
+        if method in ('GET', 'DELETE'):
+            request, content = cls._http.request(url, method=method)
         else:
             request, content = cls._http.request(url, method=method, body=xml, headers={'content-type': 'application/xml'})
         
@@ -64,9 +64,8 @@ class Highrise:
             else:
                 raise UnexpectedResponse, content
     
-        # if this was a PUT request, return status (hopefully success)
-        if method == 'PUT':
-            print content
+        # if this was a PUT or DELETE request, return status (hopefully success)
+        if method in ('PUT', 'DELETE'):
             return status
         
         # for GET and POST requests, return the XML response
@@ -100,7 +99,7 @@ class Highrise:
             match = re.search(r'([A-Z])', key)
 
         return key[1:]
-    
+
 
 class HighriseObject(object):
     """Base class for all Highrise data objects"""
@@ -117,9 +116,9 @@ class HighriseObject(object):
             # convert the key to underscore notation for Python
             key = child.tag.replace('-', '_')
         
-            # if there is no data, just set a None value
+            # if there is no data, just set the default
             if child.text == None:
-                self.__dict__[key] = None
+                self.__dict__[key] = self.fields[key].default
                 continue
 
             # handle the contact-data key differently
@@ -172,27 +171,44 @@ class HighriseObject(object):
     def __init__(self, parent=None, **kwargs):
         """Create a new object manually."""
 
-        self.id = None
         self._server = Highrise._server
-        self._editable = ()
-
-        # iterate over the keyword arguments provided
-        # and set them to the object
-        for i in kwargs:
-            self.__dict__[i] = kwargs[i]
+        for field, settings in self.fields.iteritems():
+            if field in kwargs:
+                if not settings.is_editable:
+                    raise KeyError, '%s is not an editable attribute' % field
+                value = kwargs.pop(field)
+            else:
+                value = settings.default
+            self.__dict__[field] = value
+        
     
-    def save_xml(self, **kwargs):
+    def save_xml(self, include_id=False, **kwargs):
         """Return the object XML for sending back to Highrise"""
-
+        
         # create new XML object
         if 'base_element' not in kwargs:
             kwargs['base_element'] = Highrise.class_to_key(self.__class__.__name__)
         xml = ElementTree.Element(kwargs['base_element'])
         
-        # iterate over the object attributes
-        for key, value in self.__dict__.iteritems():
-            # ignore attribute if it is not editable and not and id that we want to include
-            if key not in self._editable and not ('include_id' in kwargs and key == 'id'):
+        # if the id should be included and it is not None, add it first
+        if include_id and 'id' in self.__dict__ and self.id != None:
+            xml.insert(0, ElementTree.Element(tag='id', text=str(self.id)))
+
+        # now iterate over the editable attributes
+        for field, settings in self.fields.iteritems():
+            
+            # get the value for this field, or pass if it is missing
+            if field in self.__dict__:
+                value = self.__dict__[field]
+            else:
+                continue
+            
+            # if the field is not editable, don't pass it
+            if not settings.is_editable:
+                continue
+            
+            # if the value is equal to the default, don't pass it
+            if value == settings.default:
                 continue
             
             # if the value is a HighriseObject, insert the XML for it
@@ -200,126 +216,54 @@ class HighriseObject(object):
                 xml.insert(0, value.save_xml(include_id=True))
                 continue
             
-            # don't include the id value if it is not set
-            if 'include_id' in kwargs and key == 'id' and value == None:
-                continue
-
             # insert the remaining single-attribute elements
-            e = ElementTree.Element(key.replace('_', '-'))
-            if value != None:
-                if isinstance(value, int):
-                    e.text = str(value)
-                elif isinstance(value, list):
-                    for item in value:
-                        e.insert(0, item.save_xml(include_id=True))
-                else:
-                    e.text = value
+            e = ElementTree.Element(field.replace('_', '-'))
+            if isinstance(value, int):
+                e.text = str(value)
+            elif isinstance(value, list):
+                if len(value) == 0:
+                    continue
+                for item in value:
+                    e.insert(0, item.save_xml(include_id=True))
+            else:
+                e.text = value
             xml.insert(0, e)
 
+        # return the final XML Element object
         return xml
+
+
+class HighriseField(object):
+    """An object to represent the settings for an object attribute
+    Note that a lot more detail could go into how this works."""
+
+    def __init__(self, type='uneditable', options=None):
+        self.type = type
+        self.options = options
     
-
-class Person(HighriseObject):
-    """An object representing a Highrise person."""
-
-    @classmethod
-    def all(cls):
-        """Get all people"""
-
-        return cls._list('people.xml', 'person')
-
-    @classmethod
-    def filter(cls, **kwargs):
-        """Get a list of people based on filter criteria"""
-
-        # get the path for filter methods that only take a single argument
+    @property
+    def default(self):
+        """Return the default value for this data type (e.g. '' or [])"""
         
-        if 'term' in kwargs:
-            path = '/people/search.xml?term=%s' % kwargs['term']
-            if len(kwargs) > 1:
-                raise KeyError, '"term" can not be used with any other keyward arguments'
-        
-        elif 'company_id' in kwargs:
-            path = '/companies/%s/people.xml' % kwargs['company_id']
-            if len(kwargs) > 1:
-                raise KeyError, '"company_id" can not be used with any other keyward arguments'
-        
-        elif 'tag_id' in kwargs:
-            path = '/people.xml?tag_id=%s' % kwargs['tag_id']
-            if len(kwargs) > 1:
-                raise KeyError, '"tag_id" can not be used with any other keyward arguments'
-        
-        elif 'title' in kwargs:
-            path = '/people.xml?title=%s' % kwargs['title']
-            if len(kwargs) > 1:
-                raise KeyError, '"title" can not be used with any other keyward arguments'
-
-        elif 'since' in kwargs:
-            path = '/people.xml?since=%s' % datetime.datetime.strftime(kwargs['since'], '%Y%m%d%H%M%S')
-            if len(kwargs) > 1:
-                raise KeyError, '"since" can not be used with any other keyward arguments'
-        
-        # if we didn't get a single-argument kwarg, process using the search criteria method
+        if self.type in ('id', 'uneditable'):
+            return None
         else:
-            path = '/people/search.xml?'
-            for key in kwargs:
-                path += 'criteria[%s]=%s&' % (key, kwargs[key])
-            path = path[:-1]
-            search = True
-                    
-        # return the list of people from Highrise
-        return cls._list(path, 'person')
-
-    @classmethod
-    def get(cls, id):
-        """Get a single person"""
-
-        # retrieve the person from Highrise
-        xml = Highrise.request('/people/%s.xml' % id)
-
-        # return a person object
-        for person_xml in xml.getiterator(tag='person'):
-            return Person.from_xml(person_xml)
+            return self.type()
     
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('first_name', 'last_name', 'title', 'company_id', 'background', 'contact_data', 'subject_datas')
-    
-    def save(self):
-        """Writing to the Highrise API hasn't been implemented yet."""
-
-        xml = self.save_xml()
-        xml_string = ElementTree.tostring(xml)
-                
-        if self.id == None:
-            method = 'POST'
-            path = '/people.xml'
-        else:
-            method = 'PUT'
-            path = '/people/%s.xml' % self.id
-            
-        response = Highrise.request(path, method=method, xml=xml_string)
+    @property
+    def is_editable(self):
+        """Boolean flag for whether or not this field is editable"""
         
-        # if this was an initial save, update the object with the returned data
-        if method == 'POST':
-            new = Person.from_xml(response)
-            self.__dict__ = new.__dict__
+        return self.type not in ('id', 'uneditable')
         
-        # if this was a PUT request, we need to re-request the object
-        # so we can get any new ID values for phone numbers, addresses, etc.
-        elif method == 'PUT':
-            new = Person.get(self.id)
-            self.__dict__ = new.__dict__
-        
-        
-    def delete(self):
-        """Deleting via the Highrise API has not been implemented yet."""
-
-        return NotImplemented
-    
 
 class Tag(HighriseObject):
     """An object representing a Highrise tag."""
+
+    fields = {
+        'id': HighriseField(type='id'),
+        'name': HighriseField(),
+    }        
 
     @classmethod
     def all(cls):
@@ -331,10 +275,15 @@ class Tag(HighriseObject):
 class ContactData(HighriseObject):
     """An object representing contact data for a
     Highrise person or company."""
-
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('email_addresses', 'phone_numbers', 'addresses', 'instant_messengers', 'twitter_accounts', 'web_addresses')
+    
+    fields = {
+        'email_addresses': HighriseField(type=list),
+        'phone_numbers': HighriseField(type=list),
+        'addresses': HighriseField(type=list),
+        'instant_messengers': HighriseField(type=list),
+        'twitter_accounts': HighriseField(type=list),
+        'web_addresses': HighriseField(type=list),
+    }
 
     def save(self):
         """Save the parent parent person or company""" 
@@ -354,49 +303,177 @@ class ContactDetail(HighriseObject):
 class EmailAddress(ContactDetail):
     """An object representing an email address"""
 
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('address', 'location')
-        
+    fields = {
+        'id': HighriseField(type='id'),
+        'address': HighriseField(type=str),
+        'location': HighriseField(type=str, options=('Work', 'Home', 'Other')),
+    }        
+
     
 class PhoneNumber(ContactDetail):
     """An object representing an phone number"""
 
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('number', 'location')
+    fields = {
+        'id': HighriseField(type='id'),
+        'number': HighriseField(type=str),
+        'location': HighriseField(type=str, options=('Work', 'Mobile', 'Fax', 'Pager', 'Home', 'Skype', 'Other')),
+    }
 
 
 class Address(ContactDetail):
     """An object representing a physical address"""
 
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('city', 'country', 'state', 'street', 'zip', 'location')
+    fields = {
+        'id': HighriseField(type='id'),
+        'city': HighriseField(type=str),
+        'country': HighriseField(type=str),
+        'state': HighriseField(type=str),
+        'zip': HighriseField(type=str),
+        'street': HighriseField(type=str),
+        'location': HighriseField(type=str, options=('Work', 'Home', 'Other')),
+    }
         
 
 class InstantMessenger(ContactDetail):
     """An object representing an instant messanger"""
 
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('address', 'protocol', 'location')
+    fields = {
+        'id': HighriseField(type='id'),
+        'address': HighriseField(type=str),
+        'protocol': HighriseField(type=str, options=('AIM', 'MSN', 'ICQ', 'Jabber', 'Yahoo', 'Skype', 'QQ', 'Sametime', 'Gadu-Gadu', 'Google Talk', 'other')),
+        'location': HighriseField(type=str, options=('Work', 'Personal', 'Other')),
+    }
 
 
 class TwitterAccount(ContactDetail):
     """An object representing an Twitter account"""
 
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('username', 'url', 'location')
+    fields = {
+        'id': HighriseField(type='id'),
+        'username': HighriseField(type=str),
+        'location': HighriseField(type=str, options=('Work', 'Personal', 'Other')),
+    }
 
 
 class WebAddress(ContactDetail):
     """An object representing a web address"""
 
-    def __init__(self, parent=None, **kwargs):
-        HighriseObject.__init__(self, parent, **kwargs)
-        self._editable = ('url', 'location')
+    fields = {
+        'id': HighriseField(type='id'),
+        'url': HighriseField(type=str),
+        'location': HighriseField(type=str, options=('Work', 'Personal', 'Other')),
+    }
+
+
+class Person(HighriseObject):
+    """An object representing a Highrise person."""
+
+    fields = {
+        'id': HighriseField(type='id'),
+        'first_name': HighriseField(type=str),
+        'last_name': HighriseField(type=str),
+        'title': HighriseField(type=str),
+        'background': HighriseField(type=str),
+        'company_id': HighriseField(type=int),
+        'company_name': HighriseField(),
+        'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
+        'owner_id': HighriseField(type=int),
+        'group_id': HighriseField(type=int),
+        'contact_data': HighriseField(type=ContactData),
+        'author_id': HighriseField(),
+        'created_at': HighriseField(),
+        'updated_at': HighriseField(),
+    }
+
+    @classmethod
+    def all(cls):
+        """Get all people"""
+
+        return cls._list('people.xml', 'person')
+
+    @classmethod
+    def filter(cls, **kwargs):
+        """Get a list of people based on filter criteria"""
+
+        # get the path for filter methods that only take a single argument
+
+        if 'term' in kwargs:
+            path = '/people/search.xml?term=%s' % kwargs['term']
+            if len(kwargs) > 1:
+                raise KeyError, '"term" can not be used with any other keyward arguments'
+
+        elif 'company_id' in kwargs:
+            path = '/companies/%s/people.xml' % kwargs['company_id']
+            if len(kwargs) > 1:
+                raise KeyError, '"company_id" can not be used with any other keyward arguments'
+
+        elif 'tag_id' in kwargs:
+            path = '/people.xml?tag_id=%s' % kwargs['tag_id']
+            if len(kwargs) > 1:
+                raise KeyError, '"tag_id" can not be used with any other keyward arguments'
+
+        elif 'title' in kwargs:
+            path = '/people.xml?title=%s' % kwargs['title']
+            if len(kwargs) > 1:
+                raise KeyError, '"title" can not be used with any other keyward arguments'
+
+        elif 'since' in kwargs:
+            path = '/people.xml?since=%s' % datetime.datetime.strftime(kwargs['since'], '%Y%m%d%H%M%S')
+            if len(kwargs) > 1:
+                raise KeyError, '"since" can not be used with any other keyward arguments'
+
+        # if we didn't get a single-argument kwarg, process using the search criteria method
+        else:
+            path = '/people/search.xml?'
+            for key in kwargs:
+                path += 'criteria[%s]=%s&' % (key, kwargs[key])
+            path = path[:-1]
+            search = True
+
+        # return the list of people from Highrise
+        return cls._list(path, 'person')
+
+    @classmethod
+    def get(cls, id):
+        """Get a single person"""
+
+        # retrieve the person from Highrise
+        xml = Highrise.request('/people/%s.xml' % id)
+
+        # return a person object
+        for person_xml in xml.getiterator(tag='person'):
+            return Person.from_xml(person_xml)
+
+    def save(self):
+        """Save a person to Highrise."""
+
+        # get the XML for the request
+        xml = self.save_xml()
+        xml_string = ElementTree.tostring(xml)
+
+        # if this was an initial save, update the object with the returned data
+        if self.id == None:
+            method = 'POST'
+            path = '/people.xml'
+            response = Highrise.request(path, method=method, xml=xml_string)
+            new = Person.from_xml(response)
+
+        # if this was a PUT request, we need to re-request the object
+        # so we can get any new ID values for phone numbers, addresses, etc.
+        else:
+            method = 'PUT'
+            path = '/people/%s.xml' % self.id
+            response = Highrise.request(path, method=method, xml=xml_string)
+            new = Person.get(self.id)
+            self.id = new.id
+
+        # update the values of self to align with what came back from Highrise
+        
+
+    def delete(self):
+        """Delete a person from Highrise."""
+
+        Highrise.request('/people/%s.xml' % self.id, method='DELETE')
 
 
 class ElevatorError(Exception):
@@ -433,4 +510,3 @@ class UnexpectedResponse(ElevatorError):
 
 class InsufficientStorage(ElevatorError):
     pass
-
