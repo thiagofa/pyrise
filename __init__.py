@@ -290,7 +290,64 @@ class Tag(HighriseObject):
         """Add a tag to a specific person, company, case, or deal"""
 
         return Highrise.request('%s/%s/tags/%s.xml' % (subject, subject_id, tag_id), method='DELETE')
-            
+
+
+class Note(HighriseObject):
+    """An object representing a Highrise note."""
+
+    fields = {
+        'id': HighriseField(type='id'),
+        'body': HighriseField(type=str),
+        'author_id': HighriseField(),
+        'subject_id': HighriseField(type=int),
+        'subject_type': HighriseField(type=str, options=('Party', 'Deal', 'Kase')),
+        'subject_name': HighriseField(),
+        'collection_id': HighriseField(type=int),
+        'collection_type': HighriseField(type=str, options=('Deal', 'Kase')),
+        'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
+        'owner_id': HighriseField(type=int),
+        'group_id': HighriseField(type=int),
+        'created_at': HighriseField(),
+        'updated_at': HighriseField(),
+    }
+
+    @classmethod
+    def get(cls, id):
+        """Get a single note"""
+
+        # retrieve the note from Highrise
+        xml = Highrise.request('/notes/%s.xml' % id)
+
+        # return a note object
+        for note_xml in xml.getiterator(tag='note'):
+            return Note.from_xml(note_xml)
+
+    def save(self):
+        """Save a note to Highrise."""
+
+        # get the XML for the request
+        xml = self.save_xml()
+        xml_string = ElementTree.tostring(xml)
+
+        # if this was an initial save, update the object with the returned data
+        if self.id == None:
+            response = Highrise.request('/notes.xml', method='POST', xml=xml_string)
+            new = Note.from_xml(response)
+
+        # if this was a PUT request, we need to re-request the object
+        # so we can get any new ID values set at ceation
+        else:
+            response = Highrise.request('/notes/%s.xml' % self.id, method='PUT', xml=xml_string)
+            new = Note.get(self.id)
+
+        # update the values of self to align with what came back from Highrise
+        self.__dict__ = new.__dict__
+
+    def delete(self):
+        """Delete a note from Highrise."""
+
+        return Highrise.request('/notes/%s.xml' % self.id, method='DELETE')
+
 
 class ContactData(HighriseObject):
     """An object representing contact data for a
@@ -504,17 +561,13 @@ class Person(HighriseObject):
 
         # if this was an initial save, update the object with the returned data
         if self.id == None:
-            method = 'POST'
-            path = '/people.xml'
-            response = Highrise.request(path, method=method, xml=xml_string)
+            response = Highrise.request('/people.xml', method='POST', xml=xml_string)
             new = Person.from_xml(response)
 
         # if this was a PUT request, we need to re-request the object
         # so we can get any new ID values for phone numbers, addresses, etc.
         else:
-            method = 'PUT'
-            path = '/people/%s.xml' % self.id
-            response = Highrise.request(path, method=method, xml=xml_string)
+            response = Highrise.request('/people/%s.xml' % self.id, method='PUT', xml=xml_string)
             new = Person.get(self.id)
 
         # update the values of self to align with what came back from Highrise
@@ -523,7 +576,7 @@ class Person(HighriseObject):
     def delete(self):
         """Delete a person from Highrise."""
 
-        Highrise.request('/people/%s.xml' % self.id, method='DELETE')    
+        return Highrise.request('/people/%s.xml' % self.id, method='DELETE')
 
 
 class ElevatorError(Exception):
