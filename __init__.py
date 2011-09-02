@@ -29,7 +29,7 @@ class Highrise:
             cls._server = "https://%s.highrisehq.com" % server
     
     @classmethod
-    def request(cls, path):
+    def request(cls, path, method='GET', xml=None):
         """Process an arbitrary request to Highrise.
         
         Ordinarily, you shouldn't have to call this method directly,
@@ -39,36 +39,41 @@ class Highrise:
         url = '%s/%s' % (cls._server, path.strip('/'))
         
         # create the curl command
-        request, content = cls._http.request(url, method = 'GET')
+        if method == 'GET':
+            request, content = cls._http.request(url, method='GET')
+        else:
+            request, content = cls._http.request(url, method=method, body=xml, headers={'content-type': 'application/xml'})
         
-        # parse the XML
-        try:
-            content = ElementTree.fromstring(content)
-        except:
-            raise UnexpectedResponse, "The server sent back something that wasn't valid XML."
-            
         # raise appropriate exceptions if there is an error
         status = int(request['status'])
-        if status >= 400 or content.tag == 'error':
+        if status >= 400:
             if status == 400:
-                raise BadRequest, content.text
+                raise BadRequest
             elif status == 401:
-                raise AuthorizationRequired, content.text
+                raise AuthorizationRequired, content
             elif status == 403:
-                raise Forbidden, content.text
+                raise Forbidden, content
             elif status == 404:
-                raise NotFound, content.text
+                raise NotFound, content
             elif status == 422:
-                raise GatewayFailure, content.text
+                raise GatewayFailure, content
             elif status == 502:
-                raise GatewayConnectionError, content.text
+                raise GatewayConnectionError, content
             elif status == 507:
-                raise InsufficientStorage, content.text
+                raise InsufficientStorage, content
             else:
-                raise UnexpectedResponse, content.text
+                raise UnexpectedResponse, content
     
-        # return the processed content from Highrise
-        return content
+        # if this was a PUT request, return status (hopefully success)
+        if method == 'PUT':
+            print content
+            return status
+        
+        # for GET and POST requests, return the XML response
+        try:
+            return ElementTree.fromstring(content)
+        except:
+            raise UnexpectedResponse, "The server sent back something that wasn't valid XML."
 
     @classmethod
     def key_to_class(cls, key):
@@ -167,13 +172,51 @@ class HighriseObject(object):
     def __init__(self, parent=None, **kwargs):
         """Create a new object manually."""
 
-        self._server = Highrise._server
         self.id = None
+        self._server = Highrise._server
+        self._editable = ()
 
         # iterate over the keyword arguments provided
         # and set them to the object
         for i in kwargs:
             self.__dict__[i] = kwargs[i]
+    
+    def save_xml(self, **kwargs):
+        """Return the object XML for sending back to Highrise"""
+
+        # create new XML object
+        if 'base_element' not in kwargs:
+            kwargs['base_element'] = Highrise.class_to_key(self.__class__.__name__)
+        xml = ElementTree.Element(kwargs['base_element'])
+        
+        # iterate over the object attributes
+        for key, value in self.__dict__.iteritems():
+            # ignore attribute if it is not editable and not and id that we want to include
+            if key not in self._editable and not ('include_id' in kwargs and key == 'id'):
+                continue
+            
+            # if the value is a HighriseObject, insert the XML for it
+            if isinstance(value, HighriseObject):
+                xml.insert(0, value.save_xml(include_id=True))
+                continue
+            
+            # don't include the id value if it is not set
+            if 'include_id' in kwargs and key == 'id' and value == None:
+                continue
+
+            # insert the remaining single-attribute elements
+            e = ElementTree.Element(key.replace('_', '-'))
+            if value != None:
+                if isinstance(value, int):
+                    e.text = str(value)
+                elif isinstance(value, list):
+                    for item in value:
+                        e.insert(0, item.save_xml(include_id=True))
+                else:
+                    e.text = value
+            xml.insert(0, e)
+
+        return xml
     
 
 class Person(HighriseObject):
@@ -235,14 +278,40 @@ class Person(HighriseObject):
         xml = Highrise.request('/people/%s.xml' % id)
 
         # return a person object
-        for person_xml in xml.getiterator(tag = 'person'):
+        for person_xml in xml.getiterator(tag='person'):
             return Person.from_xml(person_xml)
-
+    
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('first_name', 'last_name', 'title', 'company_id', 'background', 'contact_data', 'subject_datas')
+    
     def save(self):
         """Writing to the Highrise API hasn't been implemented yet."""
 
-        return NotImplemented
-
+        xml = self.save_xml()
+        xml_string = ElementTree.tostring(xml)
+                
+        if self.id == None:
+            method = 'POST'
+            path = '/people.xml'
+        else:
+            method = 'PUT'
+            path = '/people/%s.xml' % self.id
+            
+        response = Highrise.request(path, method=method, xml=xml_string)
+        
+        # if this was an initial save, update the object with the returned data
+        if method == 'POST':
+            new = Person.from_xml(response)
+            self.__dict__ = new.__dict__
+        
+        # if this was a PUT request, we need to re-request the object
+        # so we can get any new ID values for phone numbers, addresses, etc.
+        elif method == 'PUT':
+            new = Person.get(self.id)
+            self.__dict__ = new.__dict__
+        
+        
     def delete(self):
         """Deleting via the Highrise API has not been implemented yet."""
 
@@ -263,6 +332,10 @@ class ContactData(HighriseObject):
     """An object representing contact data for a
     Highrise person or company."""
 
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('email_addresses', 'phone_numbers', 'addresses', 'instant_messengers', 'twitter_accounts', 'web_addresses')
+
     def save(self):
         """Save the parent parent person or company""" 
         
@@ -281,25 +354,49 @@ class ContactDetail(HighriseObject):
 class EmailAddress(ContactDetail):
     """An object representing an email address"""
 
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('address', 'location')
+        
     
 class PhoneNumber(ContactDetail):
     """An object representing an phone number"""
+
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('number', 'location')
 
 
 class Address(ContactDetail):
     """An object representing a physical address"""
 
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('city', 'country', 'state', 'street', 'zip', 'location')
+        
 
 class InstantMessenger(ContactDetail):
     """An object representing an instant messanger"""
+
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('address', 'protocol', 'location')
 
 
 class TwitterAccount(ContactDetail):
     """An object representing an Twitter account"""
 
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('username', 'url', 'location')
+
 
 class WebAddress(ContactDetail):
     """An object representing a web address"""
+
+    def __init__(self, parent=None, **kwargs):
+        HighriseObject.__init__(self, parent, **kwargs)
+        self._editable = ('url', 'location')
 
 
 class ElevatorError(Exception):
@@ -336,5 +433,4 @@ class UnexpectedResponse(ElevatorError):
 
 class InsufficientStorage(ElevatorError):
     pass
-
 
