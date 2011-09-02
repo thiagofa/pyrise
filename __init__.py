@@ -269,20 +269,27 @@ class Tag(HighriseObject):
         return cls._list('tags.xml', 'tag')
     
     @classmethod
-    def get_by(cls, subject, id):
+    def get_by(cls, subject, subject_id):
         """Get tags for a specific person, company, case, or deal"""
 
-        return cls._list('%s/%s/tags.xml' % (subject, id), 'tag')
+        return cls._list('%s/%s/tags.xml' % (subject, subject_id), 'tag')
 
     @classmethod
-    def add_to(cls, subject, id, name):
+    def add_to(cls, subject, subject_id, name):
         """Add a tag to a specific person, company, case, or deal"""
         
         xml = ElementTree.Element(tag='name')
         xml.text = name
         xml_string = ElementTree.tostring(xml)
         
-        return Highrise.request('%s/%s/tags.xml' % (subject, id), method='POST', xml=xml_string)
+        response = Highrise.request('%s/%s/tags.xml' % (subject, subject_id), method='POST', xml=xml_string)
+        return cls.from_xml(response)
+
+    @classmethod
+    def remove_from(cls, subject, subject_id, tag_id):
+        """Add a tag to a specific person, company, case, or deal"""
+
+        return Highrise.request('%s/%s/tags/%s.xml' % (subject, subject_id, tag_id), method='DELETE')
             
 
 class ContactData(HighriseObject):
@@ -477,6 +484,16 @@ class Person(HighriseObject):
 
         # add the tag
         return Tag.add_to('people', self.id, name)
+
+    def remove_tag(self, tag_id):
+        """Remove a tag from a person"""
+
+        # sanity check: has this person been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the person before you can load thier tags'
+
+        # remove the tag
+        return Tag.remove_from('people', self.id, tag_id)
         
     def save(self):
         """Save a person to Highrise."""
