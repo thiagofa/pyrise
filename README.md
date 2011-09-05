@@ -8,7 +8,7 @@ Here's a simple example of all the code needed to add a new person to Highrise,
 then add a tag and a note to their contact record:
 
     >>> from pyrise import *
-    >>> Highrise.server('my-server')
+    >>> Highrise.set_server('my-server')
     >>> Highrise.auth('api-key-goes-here')
     >>> p = Person()
     >>> p.first_name = 'Joe'
@@ -58,7 +58,7 @@ Connect to Highrise
 Set up your Highrise login info:
 
     >>> from pyrise import *
-    >>> Highrise.server('my-server')
+    >>> Highrise.set_server('my-server')
     >>> Highrise.auth('api-key-goes-here')
 
 Once configured you can use the pyrise classes to directly interact with Highrise
