@@ -5,6 +5,18 @@ objects that work a lot like Django models, making the whole experience of
 integrating with Highrise just a little more awesome and Pythonic.
 
 
+Work in progress
+-------------------
+Please bear in mind that this module is far from finished. While I've covered
+People, Companies, Tags, and Notes pretty well, I haven't even scratched the
+surface of Cases, Deals, Emails, Comments, Tasks, Users, Groups, Memberships,
+Account operations, or Custom Fields. If you want to contribute please let
+me know.
+
+Once this is in more of a complete state, we should probably get it up on
+PyPi so you can use easy_install and/or pip to get it loaded.
+
+
 Installation
 ------------
 Just clone this repository anywhere in your PythonPath like this:
@@ -19,18 +31,6 @@ the Python interactive terminal:
     >>> import pyrise
 
 If you don't get an error, you should be good to go.
-
-
-Work in progress
--------------------
-Please bear in mind that this module is far from finished. While I've covered
-People, Tags, and Notes pretty well, I haven't even scratched the surface of
-Companies, Cases, Deals, Emails, Comments, Tasks, Users, Groups, Memberships,
-Account operations, or Custom Fields. If you want to contribute please let
-me know.
-
-Once this is in more of a complete state, we should probably get it up on
-PyPi so you can use easy_install and/or pip to get it loaded.
 
 
 Connect to Highrise
