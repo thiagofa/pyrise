@@ -442,152 +442,198 @@ class WebAddress(ContactDetail):
     }
 
 
-class Person(HighriseObject):
-    """An object representing a Highrise person."""
+class Party(HighriseObject):
+    """An object representing a Highrise person or company."""
 
-    fields = {
-        'id': HighriseField(type='id'),
-        'first_name': HighriseField(type=str),
-        'last_name': HighriseField(type=str),
-        'title': HighriseField(type=str),
-        'background': HighriseField(type=str),
-        'company_id': HighriseField(type=int),
-        'company_name': HighriseField(),
-        'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
-        'owner_id': HighriseField(type=int),
-        'group_id': HighriseField(type=int),
-        'contact_data': HighriseField(type=ContactData),
-        'author_id': HighriseField(),
-        'created_at': HighriseField(),
-        'updated_at': HighriseField(),
-    }
+    def __new__(cls, extended_fields={}):
+        """Set object attributes for subclasses of Party (companies and people)"""
+
+        # set the base fields dictionary and extend it with any additional fields
+        cls.fields = {
+            'id': HighriseField(type='id'),
+            'background': HighriseField(type=str),
+            'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
+            'owner_id': HighriseField(type=int),
+            'group_id': HighriseField(type=int),
+            'contact_data': HighriseField(type=ContactData),
+            'author_id': HighriseField(),
+            'created_at': HighriseField(),
+            'updated_at': HighriseField(),
+        }
+        cls.fields.update(extended_fields)
+        
+        # send back the object reference
+        return HighriseObject.__new__(cls)
     
     @classmethod
     def all(cls):
-        """Get all people"""
+        """Get all parties"""
 
-        return cls._list('people.xml', 'person')
+        return cls._list('%s.xml' % cls.plural, 'person')
 
     @classmethod
-    def filter(cls, **kwargs):
-        """Get a list of people based on filter criteria"""
+    def filter(cls, path=None, **kwargs):
+        """Get a list of parties based on filter criteria"""
 
         # get the path for filter methods that only take a single argument
-
         if 'term' in kwargs:
-            path = '/people/search.xml?term=%s' % kwargs['term']
+            path = '/%s/search.xml?term=%s' % (cls.plural, kwargs['term'])
             if len(kwargs) > 1:
                 raise KeyError, '"term" can not be used with any other keyward arguments'
 
-        elif 'company_id' in kwargs:
-            path = '/companies/%s/people.xml' % kwargs['company_id']
-            if len(kwargs) > 1:
-                raise KeyError, '"company_id" can not be used with any other keyward arguments'
-
         elif 'tag_id' in kwargs:
-            path = '/people.xml?tag_id=%s' % kwargs['tag_id']
+            path = '/%s.xml?tag_id=%s' % (cls.plural, kwargs['tag_id'])
             if len(kwargs) > 1:
                 raise KeyError, '"tag_id" can not be used with any other keyward arguments'
 
-        elif 'title' in kwargs:
-            path = '/people.xml?title=%s' % kwargs['title']
-            if len(kwargs) > 1:
-                raise KeyError, '"title" can not be used with any other keyward arguments'
-
         elif 'since' in kwargs:
-            path = '/people.xml?since=%s' % datetime.datetime.strftime(kwargs['since'], '%Y%m%d%H%M%S')
+            path = '/%s.xml?since=%s' % (cls.plural, datetime.datetime.strftime(kwargs['since'], '%Y%m%d%H%M%S'))
             if len(kwargs) > 1:
                 raise KeyError, '"since" can not be used with any other keyward arguments'
 
         # if we didn't get a single-argument kwarg, process using the search criteria method
         else:
-            path = '/people/search.xml?'
+            path = '/%s/search.xml?' % cls.plural
             for key in kwargs:
                 path += 'criteria[%s]=%s&' % (key, kwargs[key])
             path = path[:-1]
-            search = True
 
         # return the list of people from Highrise
         return cls._list(path, 'person')
 
     @classmethod
     def get(cls, id):
-        """Get a single person"""
+        """Get a single party"""
 
         # retrieve the person from Highrise
-        xml = Highrise.request('/people/%s.xml' % id)
-
+        xml = Highrise.request('/%s/%s.xml' % (cls.plural, id))
+        
         # return a person object
-        for person_xml in xml.getiterator(tag='person'):
-            return Person.from_xml(person_xml)
+        for obj_xml in xml.getiterator(tag=cls.singular):
+            return cls.from_xml(obj_xml)
 
     @property
     def tags(self):
-        """Get the tags associated with this person"""
+        """Get the tags associated with this party"""
         
         # sanity check: has this person been saved to Highrise yet?
         if self.id == None:
             raise ElevatorError, 'You have to save the person before you can load thier tags'
         
         # get the tags
-        return Tag.get_by('people', self.id)
+        return Tag.get_by(self.plural, self.id)
     
     def add_tag(self, name):
-        """Add a tag to a person"""
+        """Add a tag to a party"""
         
-        # sanity check: has this person been saved to Highrise yet?
+        # sanity check: has this party been saved to Highrise yet?
         if self.id == None:
-            raise ElevatorError, 'You have to save the person before you can load thier tags'
-
+            raise ElevatorError, 'You have to save the %s before you can load thier tags' % self.singular
+        
         # add the tag
-        return Tag.add_to('people', self.id, name)
+        return Tag.add_to(self.plural, self.id, name)
 
     def remove_tag(self, tag_id):
-        """Remove a tag from a person"""
+        """Remove a tag from a party"""
 
-        # sanity check: has this person been saved to Highrise yet?
+        # sanity check: has this party been saved to Highrise yet?
         if self.id == None:
-            raise ElevatorError, 'You have to save the person before you can load thier tags'
+            raise ElevatorError, 'You have to save the %s before you can load thier tags' % self.singular
 
         # remove the tag
-        return Tag.remove_from('people', self.id, tag_id)
+        return Tag.remove_from(self.plural, self.id, tag_id)
     
     def add_note(self, body, **kwargs):
-        """Add a note to a person"""
+        """Add a note to a party"""
         
-        # sanity check: has this person been saved to Highrise yet?
+        # sanity check: has this party been saved to Highrise yet?
         if self.id == None:
-            raise ElevatorError, 'You have to save the person before you can load thier tags'
+            raise ElevatorError, 'You have to save the %s before you can load thier tags' % self.singular
         
         # add the note and save it to Highrise
         note = Note(body=body, subject_id=self.id, subject_type='Party', **kwargs)
         note.save()
     
     def save(self):
-        """Save a person to Highrise."""
+        """Save a party to Highrise."""
 
         # get the XML for the request
         xml = self.save_xml()
         xml_string = ElementTree.tostring(xml)
+        print xml_string
 
         # if this was an initial save, update the object with the returned data
         if self.id == None:
-            response = Highrise.request('/people.xml', method='POST', xml=xml_string)
+            response = Highrise.request('/%s.xml' % self.plural, method='POST', xml=xml_string)
             new = Person.from_xml(response)
 
         # if this was a PUT request, we need to re-request the object
         # so we can get any new ID values for phone numbers, addresses, etc.
         else:
-            response = Highrise.request('/people/%s.xml' % self.id, method='PUT', xml=xml_string)
-            new = Person.get(self.id)
+            response = Highrise.request('/%s/%s.xml' % (self.plural, self.id), method='PUT', xml=xml_string)
+            new = self.get(self.id)
 
         # update the values of self to align with what came back from Highrise
         self.__dict__ = new.__dict__
 
     def delete(self):
-        """Delete a person from Highrise."""
+        """Delete a party from Highrise."""
 
-        return Highrise.request('/people/%s.xml' % self.id, method='DELETE')
+        return Highrise.request('/%s/%s.xml' % (self.plural, self.id), method='DELETE')
+
+
+class Person(Party):
+    """An object representing a Highrise person"""
+    
+    plural = 'people'
+    singular = 'person'
+
+    def __new__(cls):
+        extended_fields = {
+            'first_name': HighriseField(type=str),
+            'last_name': HighriseField(type=str),
+            'title': HighriseField(type=str),
+            'company_id': HighriseField(type=int),
+            'company_name': HighriseField(),
+        }
+        return Party.__new__(cls, extended_fields)
+
+    @classmethod
+    def filter(cls, **kwargs):
+        """Get a list of people based on filter criteria"""
+
+        # we'll only use this method for company_id and title,
+        # all other requests punt to the parent method on the Party object
+        if not ('company_id' in kwargs or 'title' in kwargs):
+            return Party.filter(**kwargs)
+
+        # get all people in a company
+        if 'company_id' in kwargs:
+            path = '/companies/%s/people.xml' % kwargs['company_id']
+            if len(kwargs) > 1:
+                raise KeyError, '"company_id" can not be used with any other keyward arguments'
+
+        # get all people will a specific title
+        elif 'title' in kwargs:
+            path = '/people.xml?title=%s' % kwargs['title']
+            if len(kwargs) > 1:
+                raise KeyError, '"title" can not be used with any other keyward arguments'
+
+        # return the list of people from Highrise
+        return cls._list(path, 'person')
+
+
+class Company(Party):
+    """An object representing a Highrise company"""
+
+    plural = 'companies'
+    singular = 'company'
+
+    def __new__(cls):
+        extended_fields = {
+            'name': HighriseField(type=str),
+        }
+        return Party.__new__(cls, extended_fields)
 
 
 class ElevatorError(Exception):

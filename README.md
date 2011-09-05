@@ -110,6 +110,20 @@ Delete a person
     >>> person.delete()
 
 
+The Company class
+---------------------
+
+The Company class works just like the Person class, with the only exception being that
+it does not support the `company_id` and `title` arguments in the `.search()` method.
+
+>>> company = Company.get(12345)
+>>> company.name = 'Amazing Corp."
+>>> company.save()
+>>> company.delete()
+
+See the Person class documentation above for additional examples.
+
+
 The Tag class
 -------------------
 
@@ -137,6 +151,12 @@ Add a note to a person
     >>> person = Person.get(12345)
     >>> person.add_note('Just got off the phone with this guy. He rocks.')
     >>> person.save()
+
+Add a note to a company
+
+    >>> company = Company.get(12345)
+    >>> company.add_note('This company is freaking awesome.')
+    >>> company.save()
 
 More advanced way to add a note
 
