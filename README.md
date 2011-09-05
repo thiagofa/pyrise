@@ -4,6 +4,20 @@ More just just a Python wrapper for Highrise, pyrise gives you class
 objects that work a lot like Django models, making the whole experience of
 integrating with Highrise just a little more awesome and Pythonic.
 
+Here's a simple example of all the code needed to add a new person to Highrise,
+then add a tag and a note to their contact record:
+
+    >>> from pyrise import *
+    >>> Highrise.server('my-server')
+    >>> Highrise.auth('api-key-goes-here')
+    >>> p = Person()
+    >>> p.first_name = 'Joe'
+    >>> p.last_name = 'Schmoe'
+    >>> p.contact_data.email_addresses.append(EmailAddress(address="joe@schmoe.com"))
+    >>> p.save()
+    >>> p.add_tag('new-guy')
+    >>> p.add_note('just added this new guy!')
+
 
 Work in progress
 -------------------
