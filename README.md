@@ -34,6 +34,7 @@ Installation
     $ sudo pip install pyrise
 
 or
+
     $ sudo easy_install pyrise
 
 Alternately, you can just the GitHub repository anywhere in your PythonPath like this:
