@@ -116,10 +116,10 @@ The Company class
 The Company class works just like the Person class, with the only exception being that
 it does not support the `company_id` and `title` arguments in the `.search()` method.
 
->>> company = Company.get(12345)
->>> company.name = 'Amazing Corp."
->>> company.save()
->>> company.delete()
+    >>> company = Company.get(12345)
+    >>> company.name = 'Amazing Corp."
+    >>> company.save()
+    >>> company.delete()
 
 See the Person class documentation above for additional examples.
 
