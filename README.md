@@ -27,17 +27,21 @@ surface of Cases, Deals, Emails, Comments, Tasks, Users, Groups, Memberships,
 Account operations, or Custom Fields. If you want to contribute please let
 me know.
 
-Once this is in more of a complete state, we should probably get it up on
-PyPi so you can use easy_install and/or pip to get it loaded.
-
 
 Installation
 ------------
-Just clone this repository anywhere in your PythonPath like this:
+
+    $ sudo pip install pyrise
+
+or
+    $ sudo easy_install pyrise
+
+Alternately, you can just the GitHub repository anywhere in your PythonPath like this:
 
     $ git clone http://github.com/feedmagnet/pyrise.git
 
-Note that you'll also need to get httplib2 if you don't already have it.
+Note that if you are installing manually, you'll need to get httplib2 if you don't
+already have it.
 
 Once you've done one of the above, you can test to see if it is installed from
 the Python interactive terminal:
