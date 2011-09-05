@@ -4,7 +4,7 @@ import sys
 import datetime
 from xml.etree import ElementTree
 
-__version__ = '0.2'
+__version__ = '0.2.1'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -472,9 +472,14 @@ class Party(HighriseObject):
         return cls._list('%s.xml' % cls.plural, 'person')
 
     @classmethod
-    def filter(cls, path=None, **kwargs):
+    def filter(cls, **kwargs):
         """Get a list of parties based on filter criteria"""
-
+        
+        # if company_id or title are present in kwargs, we should be running
+        # this against the Person object directly
+        if ('company_id' in kwargs or 'title' in kwargs):
+            return Person._filter(**kwargs)
+    
         # get the path for filter methods that only take a single argument
         if 'term' in kwargs:
             path = '/%s/search.xml?term=%s' % (cls.plural, kwargs['term'])
@@ -599,13 +604,8 @@ class Person(Party):
         return Party.__new__(cls, extended_fields)
 
     @classmethod
-    def filter(cls, **kwargs):
+    def _filter(cls, **kwargs):
         """Get a list of people based on filter criteria"""
-
-        # we'll only use this method for company_id and title,
-        # all other requests punt to the parent method on the Party object
-        if not ('company_id' in kwargs or 'title' in kwargs):
-            return Party.filter(**kwargs)
 
         # get all people in a company
         if 'company_id' in kwargs:
