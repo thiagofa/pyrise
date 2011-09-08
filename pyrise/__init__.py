@@ -4,7 +4,7 @@ import sys
 import datetime
 from xml.etree import ElementTree
 
-__version__ = '0.2.1'
+__version__ = '0.3.0'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -115,6 +115,10 @@ class HighriseObject(object):
             
             # convert the key to underscore notation for Python
             key = child.tag.replace('-', '_')
+            
+            # if this key is not recognized by pyrise, ignore it
+            if key not in cls.fields:
+                continue
         
             # if there is no data, just set the default
             if child.text == None:
@@ -129,12 +133,29 @@ class HighriseObject(object):
 
             # if this an element with children, it's an object relationship
             if len(child.getchildren()) > 0:
-                items = []
-                for item in child.getchildren():
-                    klass = getattr(sys.modules[__name__], Highrise.key_to_class(item.tag))
-                    items.append(klass.from_xml(item, parent=self))
-                self.__dict__[child.tag.replace('-', '_')] = items
-                continue
+                
+                # is this element an array of objects?
+                if cls.fields[key].type == list:
+                    items = []
+                    for item in child.getchildren():
+                        if item.tag == 'party':
+                            class_string = item.find('type').text
+                        else:
+                            class_string = Highrise.key_to_class(item.tag)
+                        klass = getattr(sys.modules[__name__], class_string)
+                        items.append(klass.from_xml(item, parent=self))
+                    self.__dict__[child.tag.replace('-', '_')] = items
+                    continue
+                
+                # otherwise, let's treat it like a single object
+                else:
+                    if child.tag == 'party':
+                        class_string = child.find('type').text
+                    else:
+                        class_string = Highrise.key_to_class(child.tag)
+                    klass = getattr(sys.modules[__name__], class_string)
+                    self.__dict__[child.tag.replace('-', '_')] = klass.from_xml(child, parent=self)
+                    continue
                 
             # get and convert attribute value based on type
             data_type = child.get('type')
@@ -349,6 +370,101 @@ class Note(HighriseObject):
         return Highrise.request('/notes/%s.xml' % self.id, method='DELETE')
 
 
+class Deal(HighriseObject):
+    """An object representing a Highrise deal."""
+
+    fields = {
+        'id': HighriseField(type='id'),
+        'account_id': HighriseField(),
+        'author_id': HighriseField(),
+        'background': HighriseField(type=str),
+        'category_id': HighriseField(type=int),
+        'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
+        'owner_id': HighriseField(type=int),
+        'group_id': HighriseField(type=int),
+        'created_at': HighriseField(),
+        'updated_at': HighriseField(),
+        'currency': HighriseField(type=str),
+        'duration': HighriseField(type=int),
+        'name': HighriseField(type=str),
+        'price': HighriseField(type=int),
+        'price_type': HighriseField(type=str, options=('fixed', 'hour', 'month', 'year')),
+        'responsible_party_id': HighriseField(type=int),
+        'status': HighriseField(type=str, options=('pending', 'won', 'lost')),
+        'status_changed_on': HighriseField(),
+        'parties': HighriseField(type=list),
+        'party': HighriseField(),
+        'party_id': HighriseField(type=int),
+    }        
+
+    @classmethod
+    def all(cls):
+        """Get all deals"""
+
+        return cls._list('deals.xml', 'deal')
+
+    @classmethod
+    def get(cls, id):
+        """Get a single deal"""
+
+        # retrieve the deal from Highrise
+        xml = Highrise.request('/deals/%s.xml' % id)
+
+        # return a deal object
+        for deal_xml in xml.getiterator(tag='deal'):
+            return Deal.from_xml(deal_xml)
+
+    def save(self):
+        """Save a deal to Highrise."""
+
+        # get the XML for the request
+        xml = self.save_xml()
+        xml_string = ElementTree.tostring(xml)
+
+        # if this was an initial save, update the object with the returned data
+        if self.id == None:
+            response = Highrise.request('/deals.xml', method='POST', xml=xml_string)
+            new = Deal.from_xml(response)
+
+        # if this was a PUT request, we need to re-request the object
+        # so we can get any new ID values set at ceation
+        else:
+            response = Highrise.request('/deals/%s.xml' % self.id, method='PUT', xml=xml_string)
+            new = Deal.get(self.id)
+
+        # update the values of self to align with what came back from Highrise
+        self.__dict__ = new.__dict__
+    
+    def set_status(self, status):
+        """Change the status of a deal"""
+
+        # prepare the XML string for submission
+        xml = ElementTree.Element('status')
+        xml_name = ElementTree.Element(tag='name')
+        xml_name.text = status
+        xml.insert(0, xml_name)
+        xml_string = ElementTree.tostring(xml)
+        
+        # submit the PUT request
+        response = Highrise.request('/deals/%s/status.xml' % self.id, method='PUT', xml=xml_string)
+
+    def add_note(self, body, **kwargs):
+        """Add a note to a deal"""
+
+        # sanity check: has this deal been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the deal before you can add a note'
+
+        # add the note and save it to Highrise
+        note = Note(body=body, subject_id=self.id, subject_type='Deal', **kwargs)
+        note.save()
+
+    def delete(self):
+        """Delete a deal from Highrise."""
+
+        return Highrise.request('/deals/%s.xml' % self.id, method='DELETE')
+        
+
 class ContactData(HighriseObject):
     """An object representing contact data for a
     Highrise person or company."""
@@ -523,7 +639,7 @@ class Party(HighriseObject):
         
         # sanity check: has this person been saved to Highrise yet?
         if self.id == None:
-            raise ElevatorError, 'You have to save the person before you can load thier tags'
+            raise ElevatorError, 'You have to save the person before you can load their tags'
         
         # get the tags
         return Tag.get_by(self.plural, self.id)
@@ -533,7 +649,7 @@ class Party(HighriseObject):
         
         # sanity check: has this party been saved to Highrise yet?
         if self.id == None:
-            raise ElevatorError, 'You have to save the %s before you can load thier tags' % self.singular
+            raise ElevatorError, 'You have to save the %s before you can add a tag' % self.singular
         
         # add the tag
         return Tag.add_to(self.plural, self.id, name)
@@ -543,7 +659,7 @@ class Party(HighriseObject):
 
         # sanity check: has this party been saved to Highrise yet?
         if self.id == None:
-            raise ElevatorError, 'You have to save the %s before you can load thier tags' % self.singular
+            raise ElevatorError, 'You have to save the %s before you can remove a tag' % self.singular
 
         # remove the tag
         return Tag.remove_from(self.plural, self.id, tag_id)
@@ -553,7 +669,7 @@ class Party(HighriseObject):
         
         # sanity check: has this party been saved to Highrise yet?
         if self.id == None:
-            raise ElevatorError, 'You have to save the %s before you can load thier tags' % self.singular
+            raise ElevatorError, 'You have to save the %s before you can add a note' % self.singular
         
         # add the note and save it to Highrise
         note = Note(body=body, subject_id=self.id, subject_type='Party', **kwargs)
@@ -565,7 +681,6 @@ class Party(HighriseObject):
         # get the XML for the request
         xml = self.save_xml()
         xml_string = ElementTree.tostring(xml)
-        print xml_string
 
         # if this was an initial save, update the object with the returned data
         if self.id == None:

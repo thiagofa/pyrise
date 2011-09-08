@@ -1,3 +1,8 @@
+0.3
+---
+* Added support for Deals
+
+
 0.2
 ---
 * Added setup.py, license, and this changelog

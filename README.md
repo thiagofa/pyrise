@@ -5,7 +5,7 @@ objects that work a lot like Django models, making the whole experience of
 integrating with Highrise just a little more awesome and Pythonic.
 
 Here's a simple example of all the code needed to add a new person to Highrise,
-then add a tag and a note to their contact record:
+then add a tag and a note to their contact record
 
     >>> from pyrise import *
     >>> Highrise.set_server('my-server')
@@ -37,7 +37,7 @@ or
 
     $ sudo easy_install pyrise
 
-Alternately, you can just the GitHub repository anywhere in your PythonPath like this:
+Alternately, you can just the GitHub repository anywhere in your PythonPath like this
 
     $ git clone http://github.com/feedmagnet/pyrise.git
 
@@ -55,7 +55,7 @@ If you don't get an error, you should be good to go.
 Connect to Highrise
 --------------------
 
-Set up your Highrise login info:
+Set up your Highrise login info
 
     >>> from pyrise import *
     >>> Highrise.set_server('my-server')
@@ -81,7 +81,7 @@ Create a new person
     ... )
     >>> inky.save()
 
-Then you can edit them like this:
+Then you can edit them like this
 
     >>> inky.title = 'Chief Sea Squid'
     >>> inky.save()
@@ -92,17 +92,17 @@ Get a single person based on their id, edit, and save
     >>> underdog.title = 'The new CEO'
     >>> underdog.save()
 
-Get a list of all people in Highrise:
+Get a list of all people in Highrise
 
     >>> people = Person.all()
     >>> for person in people:
     ...     print "%s %s" % (person.first_name person.last_name)
 
-Get a list of people from basic keyword search:
+Get a list of people from basic keyword search
 
     >>> people = Person.filter(term='john')
 
-Get a list of all the people in a specific company:
+Get a list of all the people in a specific company
 
     >>> people = Person.filter(company_id=1234)
 
@@ -141,6 +141,53 @@ it does not support the `company_id` and `title` arguments in the `.search()` me
     >>> company.delete()
 
 See the Person class documentation above for additional examples.
+
+
+The Deals class
+---------------------
+
+Add a deal
+
+    >>> deal = Deal()
+    >>> deal.name = 'Super Huge Amazing Deal.'
+    >>> deal.party_id = 123456
+    >>> deal.responsible_party_id = 654321
+    >>> deal.category_id = 1234
+    >>> deal.background = 'Selling a whole bunch of ice to Eskimos.'
+    >>> deal.currency = 'USD'
+    >>> deal.price = 1000000
+    >>> deal.price_type = 'fixed'
+    >>> deal.save()
+    
+Get a single deal based on id, edit, and save
+
+    >>> deal = Deal(12345)
+    >>> print deal.name
+    Super Huge Amazing Deal.
+    >>> deal.name = 'The Biggest Deal Ever.'
+    >>> deal.save()
+
+Get a list of all deals in Highrise
+
+    >>> deals = Deal.all()
+    >>> for deal in deals:
+    ...     print deal.name
+    
+Add a note to a deal
+
+    >>> deal = Deal(12345)
+    >>> deal.add_note('Getting close to closing this deal...')
+
+Change the status of a deal
+
+    >>> deal = Deal(12345)
+    >>> deal.set_status('won') # could also be 'lost' or 'pending'
+
+Delete a deal
+
+    >>> deal = Deal(12345)
+    >>> deal.delete()
+
 
 
 The Tag class
