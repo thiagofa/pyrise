@@ -22,8 +22,8 @@ then add a tag and a note to their contact record
 Work in progress
 -------------------
 Please bear in mind that this module is far from finished. While I've covered
-People, Companies, Tags, and Notes pretty well, I haven't even scratched the
-surface of Cases, Deals, Emails, Comments, Tasks, Users, Groups, Memberships,
+People, Companies, Deals, Tags, and Notes pretty well, I haven't even scratched
+the surface of Cases, Emails, Comments, Tasks, Users, Groups, Memberships,
 Account operations, or Custom Fields. If you want to contribute please let
 me know.
 
