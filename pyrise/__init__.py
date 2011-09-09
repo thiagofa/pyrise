@@ -1,10 +1,11 @@
 import httplib2
+import urllib
 import re
 import sys
 import datetime
 from xml.etree import ElementTree
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -616,11 +617,11 @@ class Party(HighriseObject):
         else:
             path = '/%s/search.xml?' % cls.plural
             for key in kwargs:
-                path += 'criteria[%s]=%s&' % (key, kwargs[key])
+                path += 'criteria[%s]=%s&' % (key, urllib.quote(kwargs[key]))
             path = path[:-1]
 
         # return the list of people from Highrise
-        return cls._list(path, 'person')
+        return cls._list(path, cls.singular)
 
     @classmethod
     def get(cls, id):
