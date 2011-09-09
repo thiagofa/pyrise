@@ -5,7 +5,7 @@ import sys
 import datetime
 from xml.etree import ElementTree
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -599,12 +599,12 @@ class Party(HighriseObject):
     
         # get the path for filter methods that only take a single argument
         if 'term' in kwargs:
-            path = '/%s/search.xml?term=%s' % (cls.plural, kwargs['term'])
+            path = '/%s/search.xml?term=%s' % (cls.plural, urllib.quote(kwargs['term']))
             if len(kwargs) > 1:
                 raise KeyError, '"term" can not be used with any other keyward arguments'
 
         elif 'tag_id' in kwargs:
-            path = '/%s.xml?tag_id=%s' % (cls.plural, kwargs['tag_id'])
+            path = '/%s.xml?tag_id=%s' % (cls.plural, urllib.quote(kwargs['tag_id']))
             if len(kwargs) > 1:
                 raise KeyError, '"tag_id" can not be used with any other keyward arguments'
 
