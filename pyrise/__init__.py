@@ -2,7 +2,7 @@ import httplib2
 import urllib
 import re
 import sys
-import datetime
+from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
 __version__ = '0.3.2'
@@ -12,6 +12,7 @@ class Highrise:
     
     _http = httplib2.Http()
     _server = None
+    _tzoffset = 0
 
     @classmethod
     def auth(cls, token):
@@ -28,6 +29,27 @@ class Highrise:
             cls._server = server.strip('/') 
         else:
             cls._server = "https://%s.highrisehq.com" % server
+
+    @classmethod
+    def set_timezone_offset(cls, offset):
+        """Rather than force pytz or some other time zome library, Pyrise
+        works entirely in GMT (as does the Highrise API). Setting this
+        optional offset value will let you compensate for your local
+        server timezone, if desired"""
+
+        cls._tzoffset = offset
+
+    @classmethod
+    def from_utc(cls, date):
+        """Convert a date from UTC using the _tzoffset value"""
+
+        return date + timedelta(hours=cls._tzoffset)
+
+    @classmethod
+    def to_utc(cls, date):
+        """Convert a date to UTC using the _tzoffset value"""
+
+        return date - timedelta(hours=cls._tzoffset)
     
     @classmethod
     def request(cls, path, method='GET', xml=None):
@@ -163,7 +185,7 @@ class HighriseObject(object):
             if data_type == 'integer':
                 value = int(child.text)
             elif data_type == 'datetime':
-                value = datetime.datetime.strptime(child.text, '%Y-%m-%dT%H:%M:%SZ')
+                value = Highrise.from_utc(datetime.strptime(child.text, '%Y-%m-%dT%H:%M:%SZ'))
             else:
                 value = unicode(child.text)
 
@@ -244,6 +266,8 @@ class HighriseObject(object):
                     continue
                 for item in value:
                     e.insert(0, item.save_xml(include_id=True))
+            elif isinstance(value, datetime):
+                e.text = datetime.strftime(Highrise.to_utc(value), '%Y-%m-%dT%H:%M:%SZ')
             else:
                 e.text = value
             xml.insert(0, e)
@@ -263,9 +287,11 @@ class HighriseField(object):
     @property
     def default(self):
         """Return the default value for this data type (e.g. '' or [])"""
-        
+
         if self.type in ('id', 'uneditable'):
             return None
+        elif self.type == datetime:
+            return datetime.now()
         else:
             return self.type()
     
@@ -329,7 +355,7 @@ class Note(HighriseObject):
         'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
         'owner_id': HighriseField(type=int),
         'group_id': HighriseField(type=int),
-        'created_at': HighriseField(),
+        'created_at': HighriseField(type=datetime),
         'updated_at': HighriseField(),
     }
 
@@ -609,7 +635,7 @@ class Party(HighriseObject):
                 raise KeyError, '"tag_id" can not be used with any other keyward arguments'
 
         elif 'since' in kwargs:
-            path = '/%s.xml?since=%s' % (cls.plural, datetime.datetime.strftime(kwargs['since'], '%Y%m%d%H%M%S'))
+            path = '/%s.xml?since=%s' % (cls.plural, Highrise.from_utc(datetime.strftime(kwargs['since'], '%Y%m%d%H%M%S')))
             if len(kwargs) > 1:
                 raise KeyError, '"since" can not be used with any other keyward arguments'
 

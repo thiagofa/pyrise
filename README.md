@@ -37,7 +37,7 @@ or
 
     $ sudo easy_install pyrise
 
-Alternately, you can just the GitHub repository anywhere in your PythonPath like this
+Alternately, you can just clone the GitHub repository anywhere in your PythonPath like this
 
     $ git clone http://github.com/feedmagnet/pyrise.git
 
@@ -216,13 +216,11 @@ Add a note to a person
 
     >>> person = Person.get(12345)
     >>> person.add_note('Just got off the phone with this guy. He rocks.')
-    >>> person.save()
 
 Add a note to a company
 
     >>> company = Company.get(12345)
     >>> company.add_note('This company is freaking awesome.')
-    >>> company.save()
 
 More advanced way to add a note
 
@@ -247,3 +245,21 @@ Delete a note
 
     >>> note = Note(1234)
     >>> note.delete()
+
+    
+Time zone shortcut support
+------------------------------
+It is probably best do all your date interactions with Highrise using UTC
+timestamps, but if you prefer to work with Python datetime objects with a
+timezone offset, you can use the set_timezone_offset method to do so.
+
+    >>> from datetime import datetime
+    >>> Highrise.set_timezone_offset(-5) # Central Daylight Time
+    >>> local_datetime = datetime.now()
+    >>> person = Person.get(12345)
+    >>> person.add_note('Hi there.', created_at=local_datetime)
+
+Assuming your local system is set to Central Daylight Time, the local_datetime
+variable above will be in your system's timezone (CDT), but will be sent to
+Highrise in UTC. Conversely, new objects created by pulling data from Highrise
+will be in local time in your Python objects and converted when saving.
