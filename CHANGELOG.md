@@ -1,3 +1,24 @@
+0.4.0
+---
+* Added support for Emails
+
+
+0.3.3
+---
+* Added timezone offset shortcut
+* Made the created_at attribute of Notes editable
+
+
+0.3.2
+---
+* Bug fixes
+
+
+0.3.1
+---
+* Bug fixes
+
+
 0.3
 ---
 * Added support for Deals
