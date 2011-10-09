@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
-__version__ = '0.3.3'
+__version__ = '0.4.0'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -340,38 +340,46 @@ class Tag(HighriseObject):
         return Highrise.request('%s/%s/tags/%s.xml' % (subject, subject_id, tag_id), method='DELETE')
 
 
-class Note(HighriseObject):
-    """An object representing a Highrise note."""
+class Message(HighriseObject):
+    """An object representing a Highrise email or note."""
 
-    fields = {
-        'id': HighriseField(type='id'),
-        'body': HighriseField(type=str),
-        'author_id': HighriseField(),
-        'subject_id': HighriseField(type=int),
-        'subject_type': HighriseField(type=str, options=('Party', 'Deal', 'Kase')),
-        'subject_name': HighriseField(),
-        'collection_id': HighriseField(type=int),
-        'collection_type': HighriseField(type=str, options=('Deal', 'Kase')),
-        'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
-        'owner_id': HighriseField(type=int),
-        'group_id': HighriseField(type=int),
-        'created_at': HighriseField(type=datetime),
-        'updated_at': HighriseField(),
-    }
+    def __new__(cls, extended_fields={}, **kwargs):
+        """Set object attributes for subclasses of Party (companies and people)"""
+
+        # set the base fields dictionary and extend it with any additional fields
+        cls.fields = {
+            'id': HighriseField(type='id'),
+            'body': HighriseField(type=str),
+            'author_id': HighriseField(),
+            'subject_id': HighriseField(type=int),
+            'subject_type': HighriseField(type=str, options=('Party', 'Deal', 'Kase')),
+            'subject_name': HighriseField(),
+            'collection_id': HighriseField(type=int),
+            'collection_type': HighriseField(type=str, options=('Deal', 'Kase')),
+            'visible_to': HighriseField(type=str, options=('Everyone', 'Owner', 'NamedGroup')),
+            'owner_id': HighriseField(type=int),
+            'group_id': HighriseField(type=int),
+            'created_at': HighriseField(type=datetime),
+            'updated_at': HighriseField(),
+        }
+        cls.fields.update(extended_fields)
+
+        # send back the object reference
+        return HighriseObject.__new__(cls, **kwargs)
 
     @classmethod
     def get(cls, id):
-        """Get a single note"""
+        """Get a single message"""
 
-        # retrieve the note from Highrise
-        xml = Highrise.request('/notes/%s.xml' % id)
+        # retrieve the data from Highrise
+        xml = Highrise.request('/%s/%s.xml' % (cls.plural, id))
 
         # return a note object
-        for note_xml in xml.getiterator(tag='note'):
-            return Note.from_xml(note_xml)
+        for obj_xml in xml.getiterator(tag=cls.singular):
+            return cls.from_xml(obj_xml)
 
     def save(self):
-        """Save a note to Highrise."""
+        """Save a message to Highrise."""
 
         # get the XML for the request
         xml = self.save_xml()
@@ -379,22 +387,42 @@ class Note(HighriseObject):
 
         # if this was an initial save, update the object with the returned data
         if self.id == None:
-            response = Highrise.request('/notes.xml', method='POST', xml=xml_string)
-            new = Note.from_xml(response)
+            response = Highrise.request('/%s.xml' % self.plural, method='POST', xml=xml_string)
+            new = self.from_xml(response)
 
         # if this was a PUT request, we need to re-request the object
         # so we can get any new ID values set at ceation
         else:
-            response = Highrise.request('/notes/%s.xml' % self.id, method='PUT', xml=xml_string)
-            new = Note.get(self.id)
+            response = Highrise.request('/%s/%s.xml' % (self.plural, self.id), method='PUT', xml=xml_string)
+            new = cls.get(self.id)
 
         # update the values of self to align with what came back from Highrise
         self.__dict__ = new.__dict__
 
     def delete(self):
-        """Delete a note from Highrise."""
+        """Delete a message from Highrise."""
 
-        return Highrise.request('/notes/%s.xml' % self.id, method='DELETE')
+        return Highrise.request('/%s/%s.xml' % (self.plural, self.id), method='DELETE')
+
+
+class Note(Message):
+    """An object representing a Highrise note"""
+
+    plural = 'notes'
+    singular = 'note'
+
+
+class Email(Message):
+    """An object representing a Highrise email"""
+
+    plural = 'emails'
+    singular = 'email'
+
+    def __new__(cls, **kwargs):
+        extended_fields = {
+            'title': HighriseField(type=str),
+        }
+        return Message.__new__(cls, extended_fields, **kwargs)
 
 
 class Deal(HighriseObject):
@@ -485,6 +513,17 @@ class Deal(HighriseObject):
         # add the note and save it to Highrise
         note = Note(body=body, subject_id=self.id, subject_type='Deal', **kwargs)
         note.save()
+
+    def add_email(self, title, body, **kwargs):
+        """Add an email to a deal"""
+
+        # sanity check: has this deal been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the deal before you can add an email'
+
+        # add the email and save it to Highrise
+        email = Email(title=title, body=body, subject_id=self.id, subject_type='Deal', **kwargs)
+        email.save()
 
     def delete(self):
         """Delete a deal from Highrise."""
@@ -588,7 +627,7 @@ class WebAddress(ContactDetail):
 class Party(HighriseObject):
     """An object representing a Highrise person or company."""
 
-    def __new__(cls, extended_fields={}):
+    def __new__(cls, extended_fields={}, **kwargs):
         """Set object attributes for subclasses of Party (companies and people)"""
 
         # set the base fields dictionary and extend it with any additional fields
@@ -606,7 +645,7 @@ class Party(HighriseObject):
         cls.fields.update(extended_fields)
         
         # send back the object reference
-        return HighriseObject.__new__(cls)
+        return HighriseObject.__new__(cls, **kwargs)
     
     @classmethod
     def all(cls):
@@ -701,6 +740,17 @@ class Party(HighriseObject):
         # add the note and save it to Highrise
         note = Note(body=body, subject_id=self.id, subject_type='Party', **kwargs)
         note.save()
+
+    def add_email(self, title, body, **kwargs):
+        """Add an email to a party"""
+
+        # sanity check: has this party been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the %s before you can add an email' % self.singular
+
+        # add the email and save it to Highrise
+        email = Email(title=title, body=body, subject_id=self.id, subject_type='Party', **kwargs)
+        email.save()
     
     def save(self):
         """Save a party to Highrise."""
@@ -735,7 +785,7 @@ class Person(Party):
     plural = 'people'
     singular = 'person'
 
-    def __new__(cls):
+    def __new__(cls, **kwargs):
         extended_fields = {
             'first_name': HighriseField(type=str),
             'last_name': HighriseField(type=str),
@@ -743,7 +793,7 @@ class Person(Party):
             'company_id': HighriseField(type=int),
             'company_name': HighriseField(),
         }
-        return Party.__new__(cls, extended_fields)
+        return Party.__new__(cls, extended_fields, **kwargs)
 
     @classmethod
     def _filter(cls, **kwargs):
@@ -771,11 +821,11 @@ class Company(Party):
     plural = 'companies'
     singular = 'company'
 
-    def __new__(cls):
+    def __new__(cls, **kwargs):
         extended_fields = {
             'name': HighriseField(type=str),
         }
-        return Party.__new__(cls, extended_fields)
+        return Party.__new__(cls, extended_fields, **kwargs)
 
 
 class ElevatorError(Exception):

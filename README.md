@@ -21,11 +21,10 @@ then add a tag and a note to their contact record
 
 Work in progress
 -------------------
-Please bear in mind that this module is far from finished. While I've covered
-People, Companies, Deals, Tags, and Notes pretty well, I haven't even scratched
-the surface of Cases, Emails, Comments, Tasks, Users, Groups, Memberships,
-Account operations, or Custom Fields. If you want to contribute please let
-me know.
+Please bear in mind that this module is not quite finished. While I've covered
+People, Companies, Deals, Tags, Notes, Emails pretty well, I haven't even
+begun work on Cases, Comments, Tasks, Users, Groups, Memberships, Account
+operations, or Custom Fields. If you want to contribute please let me know.
 
 
 Installation
@@ -178,6 +177,11 @@ Add a note to a deal
     >>> deal = Deal(12345)
     >>> deal.add_note('Getting close to closing this deal...')
 
+Add an email to a deal
+
+    >>> deal = Deal(12345)
+    >>> deal.add_email('Email subect', 'Body text of the email.')
+
 Change the status of a deal
 
     >>> deal = Deal(12345)
@@ -217,6 +221,11 @@ Add a note to a person
     >>> person = Person.get(12345)
     >>> person.add_note('Just got off the phone with this guy. He rocks.')
 
+Add an email to a person
+
+    >>> person = Person.get(12345)
+    >>> person.add_email('Email subject line', 'Body text of the email goes here.')
+
 Add a note to a company
 
     >>> company = Company.get(12345)
@@ -245,6 +254,23 @@ Delete a note
 
     >>> note = Note(1234)
     >>> note.delete()
+
+
+The Email class
+---------------------
+
+The Email class works just like the Note class, with the addition of the title 
+argument (the email subject line) in addition to body.
+
+    >>> email = Email()
+    >>> email.title = 'Be sure to read this email'
+    >>> email.body = 'This is a super important email. Glad you read it.'
+    >>> email.subject_type = 'Party'
+    >>> email.subject_id = 12345
+    >>> email.save()
+    >>> email.delete()
+
+See the Note class documentation above for additional examples.
 
     
 Time zone shortcut support
