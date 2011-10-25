@@ -104,6 +104,11 @@ Then you can edit them like this
     >>> inky.title = 'Chief Sea Squid'
     >>> inky.save()
 
+You can pull all their notes and emails like this
+
+    >>> notes = inky.notes
+    >>> emails = inky.emails
+
 Get a single person based on their id, edit, and save
 
     >>> underdog = Person.get(12345)
@@ -184,6 +189,12 @@ Get a single deal based on id, edit, and save
     Super Huge Amazing Deal.
     >>> deal.name = 'The Biggest Deal Ever.'
     >>> deal.save()
+    
+Get the notes and emails for a deal
+
+    >>> deal = Deal(12345)
+    >>> notes = deal.notes
+    >>> emails = deal.emails
 
 Get a list of all deals in Highrise
 
@@ -268,6 +279,13 @@ Get details for a note, edit them, and save
     >>> print note.body
     >>> note.body += '\n------------\nMore details added to the note!'
     >>> note.save()
+
+Get all the notes for a person, company, deal, or case
+
+    >>> notes = Note.filter(person=12345)
+    >>> notes = Note.filter(company=12345)
+    >>> notes = Note.filter(deal=12345)
+    >>> notes = Note.filter(kase=12345)
 
 Delete a note
 

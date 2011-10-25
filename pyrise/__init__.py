@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -378,6 +378,29 @@ class Message(HighriseObject):
         for obj_xml in xml.getiterator(tag=cls.singular):
             return cls.from_xml(obj_xml)
 
+    @classmethod
+    def filter(cls, **kwargs):
+        """Get a list of messages based by subject"""
+        
+        # map kwarg to URL slug for request
+        kwarg_to_path = {
+            'person': 'people',
+            'company': 'companies',
+            'kase': 'kases',
+            'deal': 'deals',
+        }
+        
+        # find the first kwarg that we understand and use it to generate the request path
+        for key, value in kwargs.iteritems():
+            if key in kwarg_to_path:
+                path = '/%s/%s/%s.xml' % (kwarg_to_path[key], value, cls.plural)
+                break
+        else:
+            raise KeyError, 'filter method must have person, company, kase, or deal as an kwarg'
+                
+        # return the list of messages from Highrise
+        return cls._list(path, cls.singular)
+
     def save(self):
         """Save a message to Highrise."""
 
@@ -468,6 +491,28 @@ class Deal(HighriseObject):
         # return a deal object
         for deal_xml in xml.getiterator(tag='deal'):
             return Deal.from_xml(deal_xml)
+
+    @property
+    def notes(self):
+        """Get the notes associated with this deal"""
+
+        # sanity check: has this deal been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the deal before you can load its notes'
+
+        # get the notes
+        return Note.filter(deal=self.id)
+
+    @property
+    def emails(self):
+        """Get the emails associated with this deal"""
+
+        # sanity check: has this deal been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the deal before you can load its emails'
+
+        # get the emails
+        return Email.filter(deal=self.id)
 
     def save(self):
         """Save a deal to Highrise."""
@@ -710,6 +755,32 @@ class Party(HighriseObject):
         # get the tags
         return Tag.get_by(self.plural, self.id)
     
+    @property
+    def notes(self):
+        """Get the notes associated with this party"""
+
+        # sanity check: has this person been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the person before you can load their notes'
+
+        # get the notes
+        kwargs = {}
+        kwargs[self.singular] = self.id
+        return Note.filter(**kwargs)
+
+    @property
+    def emails(self):
+        """Get the emails associated with this party"""
+
+        # sanity check: has this person been saved to Highrise yet?
+        if self.id == None:
+            raise ElevatorError, 'You have to save the person before you can load their emails'
+
+        # get the emails
+        kwargs = {}
+        kwargs[self.singular] = self.id
+        return Email.filter(**kwargs)
+    
     def add_tag(self, name):
         """Add a tag to a party"""
         
@@ -823,7 +894,7 @@ class Company(Party):
 
     def __new__(cls, **kwargs):
         extended_fields = {
-            'name': HighriseField(type=str),
+            'company_name': HighriseField(type=str),
         }
         return Party.__new__(cls, extended_fields, **kwargs)
 
