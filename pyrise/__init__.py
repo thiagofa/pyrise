@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -894,7 +894,7 @@ class Company(Party):
 
     def __new__(cls, **kwargs):
         extended_fields = {
-            'company_name': HighriseField(type=str),
+            'name': HighriseField(type=str),
         }
         return Party.__new__(cls, extended_fields, **kwargs)
 

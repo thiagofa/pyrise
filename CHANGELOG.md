@@ -1,3 +1,8 @@
+0.4.2
+---
+* Bug fixes
+
+
 0.4.1
 ---
 * Added `filter()` method to Note and Email to let you pull all notes/emails from a deal, case, person, or company
