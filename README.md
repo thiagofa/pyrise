@@ -21,10 +21,29 @@ then add a tag and a note to their contact record
 
 Work in progress
 -------------------
-Please bear in mind that this module is not quite finished. While I've covered
-People, Companies, Deals, Tags, Notes, Emails pretty well, I haven't even
-begun work on Cases, Comments, Tasks, Users, Groups, Memberships, Account
-operations, or Custom Fields. If you want to contribute please let me know.
+Please bear in mind that this module is not quite finished. If you want to contribute
+to finishing it out, please feel free. As it is, we're just building feature as we
+need them.
+
+###Completed objects
+
+* People
+* Companies
+* Deals
+* Tags
+* Notes
+* Emails
+
+###Not implemented yet:
+
+* Cases
+* Comments
+* Tasks
+* Users
+* Groups
+* Memberships
+* Account operations
+* Custom Fields
 
 
 Installation
