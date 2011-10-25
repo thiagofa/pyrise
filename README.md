@@ -238,6 +238,12 @@ Get a list of tags for a person
     >>> for tag in tags:
     ...     print tag.name
 
+Get a list of all tags on your account
+
+    >>> tags = Tag.all()
+    >>> for tag in tags:
+    ...     print tag.name
+
 Remove a tag from a person
 
     >>> person.remove_tag(123)
