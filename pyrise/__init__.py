@@ -719,7 +719,7 @@ class Party(HighriseObject):
                 raise KeyError, '"tag_id" can not be used with any other keyward arguments'
 
         elif 'since' in kwargs:
-            path = '/%s.xml?since=%s' % (cls.plural, Highrise.from_utc(datetime.strftime(kwargs['since'], '%Y%m%d%H%M%S')))
+            path = '/%s.xml?since=%s' % (cls.plural, datetime.strftime(Highrise.from_utc(kwargs['since']), '%Y%m%d%H%M%S'))
             if len(kwargs) > 1:
                 raise KeyError, '"since" can not be used with any other keyward arguments'
 
