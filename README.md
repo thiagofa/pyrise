@@ -33,12 +33,12 @@ need them.
 * Tags
 * Notes
 * Emails
+* Tasks (partial)
 
 ###Not implemented yet:
 
 * Cases
 * Comments
-* Tasks
 * Users
 * Groups
 * Memberships

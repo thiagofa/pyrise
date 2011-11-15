@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
-__version__ = '0.4.2'
+__version__ = '0.4.3'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
@@ -32,7 +32,7 @@ class Highrise:
 
     @classmethod
     def set_timezone_offset(cls, offset):
-        """Rather than force pytz or some other time zome library, Pyrise
+        """Rather than force pytz or some other time zone library, Pyrise
         works entirely in GMT (as does the Highrise API). Setting this
         optional offset value will let you compensate for your local
         server timezone, if desired"""
@@ -574,6 +574,72 @@ class Deal(HighriseObject):
         """Delete a deal from Highrise."""
 
         return Highrise.request('/deals/%s.xml' % self.id, method='DELETE')
+
+
+
+class Task(HighriseObject):
+    """An object representing a Highrise task."""
+
+    fields = {
+        'id': HighriseField(type='id'),
+        'recording_id': HighriseField(type=int),
+        'subject_id': HighriseField(type=int),
+        'subject_type': HighriseField(type=str, options=('Party')),
+        'category_id': HighriseField(type=int),
+        'body': HighriseField(type=str),
+        'frame': HighriseField(type=str, options=('specific')),
+        'due_at': HighriseField(type=datetime),
+        'alert_at': HighriseField(type=datetime),
+        'created_at': HighriseField(type=datetime),
+        'author_id': HighriseField(type=int),
+        'updated_at': HighriseField(type=datetime),
+        'public': HighriseField(type=bool),
+        'owner_id': HighriseField(type=int),
+        'notify': HighriseField(type=bool),
+    }        
+
+    @classmethod
+    def all(cls):
+        """Get all tasks"""
+
+        return cls._list('tasks.xml', 'task')
+
+    @classmethod
+    def get(cls, id):
+        """Get a single task"""
+
+        # retrieve the task from Highrise
+        xml = Highrise.request('/tasks/%s.xml' % id)
+
+        # return a task object
+        for task_xml in xml.getiterator(tag='task'):
+            return Task.from_xml(task_xml)
+
+    def save(self):
+        """Save a task to Highrise."""
+
+        # get the XML for the request
+        xml = self.save_xml()
+        xml_string = ElementTree.tostring(xml)
+
+        # if this was an initial save, update the object with the returned data
+        if self.id == None:
+            response = Highrise.request('/tasks.xml', method='POST', xml=xml_string)
+            new = Task.from_xml(response)
+
+        # if this was a PUT request, we need to re-request the object
+        # so we can get any new ID values set at ceation
+        else:
+            response = Highrise.request('/tasks/%s.xml' % self.id, method='PUT', xml=xml_string)
+            new = Task.get(self.id)
+
+        # update the values of self to align with what came back from Highrise
+        self.__dict__ = new.__dict__
+    
+    def delete(self):
+        """Delete a task from Highrise."""
+
+        return Highrise.request('/tasks/%s.xml' % self.id, method='DELETE')
         
 
 class ContactData(HighriseObject):

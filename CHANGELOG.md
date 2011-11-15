@@ -1,3 +1,7 @@
+0.4.3
+---
+* Added Task class with some basic methods.
+
 0.4.2
 ---
 * Bug fixes
