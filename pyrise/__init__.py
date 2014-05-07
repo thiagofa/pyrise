@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
-__version__ = '0.4.3'
+#__version__ = '0.4.3'
 
 class Highrise:
     """Class designed to handle all interactions with the Highrise API."""
